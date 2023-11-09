@@ -13,6 +13,8 @@ spec:
     functionRef:
       name: loop
     input:
+      apiVersion: meta.bmutziu.fn.crossplane.io/v1beta1
+      kind: Input
       valuesXrPath: "spec.namespaces"
       namePrefix: "ns-"
       paths:
