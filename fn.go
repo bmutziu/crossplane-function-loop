@@ -29,6 +29,8 @@ type Function struct {
 func (f *Function) RunFunction(_ context.Context, req *fnv1beta1.RunFunctionRequest) (*fnv1beta1.RunFunctionResponse, error) {
 	f.log.Info("Running Function", "tag", req.GetMeta().GetTag())
 
+	var tags map[string]string
+
 	// This creates a new response to the supplied request. Note that Functions
 	// are run in a pipeline! Other Functions may have run before this one. If
 	// they did, response.To will copy their desired state from req to rsp. Be
@@ -53,6 +55,35 @@ func (f *Function) RunFunction(_ context.Context, req *fnv1beta1.RunFunctionRequ
 	if err != nil {
 		response.Fatal(rsp, errors.Wrapf(err, "cannot get desired composed resources from %T", req))
 		return rsp, nil
+	}
+
+	f.log.Info("Desired composed resources", "content", desired)
+
+	for name, dr := range desired {
+		f.log.Info("Desired Resource", "composed-resource-name", name)
+
+		/*region, err := dr.Resource.GetString("spec.forProvider.region")
+		if err != nil {
+			response.Fatal(rsp, errors.Wrapf(err, "cannot get values", req))
+			return rsp, nil
+		}
+		f.log.Debug("Region ", "is: ", region)*/
+
+		if name == "platformref-vpc" {
+			tags, err = dr.Resource.GetStringObject("spec.forProvider.tags")
+			if err != nil {
+				response.Fatal(rsp, errors.Wrapf(err, "cannot get values", req))
+				return rsp, nil
+			}
+			f.log.Debug("Tags ", "are :", tags)
+			for key, value := range tags {
+				fmt.Println(key, "->", value)
+			}
+
+			tags["Owner"] = strings.Replace(tags["Owner"], " ", "", -1)
+			tags["Owner"] = strings.ToLower(tags["Owner"])
+			f.log.Info("Tags", "for Owner", tags["Owner"])
+		}
 	}
 
 	// Get the observed composite resource (XR) from the request. There should
@@ -90,7 +121,11 @@ func (f *Function) RunFunction(_ context.Context, req *fnv1beta1.RunFunctionRequ
 				}
 				composed.SetString(path, patchValue)
 			} else {
-				composed.SetString(path, value)
+				if value == "dev" {
+					composed.SetString(path, tags["Owner"])
+				} else {
+					composed.SetString(path, value)
+				}
 			}
 		}
 		composed.SetString("metadata.labels.function", "loop")
@@ -102,6 +137,11 @@ func (f *Function) RunFunction(_ context.Context, req *fnv1beta1.RunFunctionRequ
 	if err := response.SetDesiredComposedResources(rsp, desired); err != nil {
 		response.Fatal(rsp, errors.Wrapf(err, "cannot set desired composed resources in %T", rsp))
 		return rsp, nil
+	}
+
+	// Check again desired resources
+	for name, _ := range desired {
+		f.log.Info("Desired Resource", "composed-resource-name", name)
 	}
 
 	return rsp, nil

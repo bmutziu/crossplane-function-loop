@@ -34,4 +34,4 @@ EXPOSE 9443
 
 USER nonroot:nonroot
 
-ENTRYPOINT ["/function"]
+ENTRYPOINT ["/function", "--debug"]
